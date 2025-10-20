@@ -33,6 +33,9 @@ import raca.Humano
 import raca.Raca
 import com.example.rpg.ui.theme.RPGTheme
 import kotlin.random.Random
+import androidx.lifecycle.viewmodel.compose.viewModel
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.example.rpg.data.*
 
 class MainActivity : ComponentActivity() {
 
@@ -41,6 +44,7 @@ class MainActivity : ComponentActivity() {
         enableEdgeToEdge()
         setContent {
             RPGTheme {
+
                 CharacterCreationScreen()
             }
         }
@@ -48,7 +52,6 @@ class MainActivity : ComponentActivity() {
 }
 
 // ============ LOGICA DOS DADOS
-// funcionamento dos dados, n consegui usar o do projeto anteiror
 private fun rolarDado(lados: Int = 6): Int = Random.nextInt(1, lados + 1)
 private fun rolar3d6(): Int = (1..3).sumOf { rolarDado(6) }
 private fun rolar4d6TirarMenor(): Int {
@@ -62,14 +65,14 @@ private fun gerarValoresHeroico(): List<Int> = List(6) { rolar4d6TirarMenor() }
 // ============= TELAS
 
 @Composable
-fun CharacterCreationScreen() {
+fun CharacterCreationScreen(
+    // Pega uma instância do ViewModel
+    viewModel: PersonagemViewModel = viewModel()
+) {
 
     var etapa by remember { mutableStateOf(0) } // qual tela sera mostrada
 
-    // dados do personagem
     var nome by remember { mutableStateOf("") }
-
-    // atributos
     val atributos = remember {
         mutableStateMapOf(
             "Força" to 0,
@@ -80,17 +83,15 @@ fun CharacterCreationScreen() {
             "Carisma" to 0
         )
     }
-
-    // lista de números sorteados
     val availableNumbers = remember { mutableStateListOf<Int>() }
-    // numero escolhido no caso de escolha de atributo
     var selectedNumber by remember { mutableStateOf<Int?>(null) }
-
-    // classes e raças
     val classes = listOf(Guerreiro(), Ladrao(), Mago())
     val races = listOf(Anao(), Elfo(), Halfling(), Humano())
     var selectedClass by remember { mutableStateOf<Classe?>(null) }
     var selectedRace by remember { mutableStateOf<Raca?>(null) }
+
+    val listaPersonagens by viewModel.personagens.collectAsStateWithLifecycle()
+
 
     Column(modifier = Modifier.fillMaxSize()) {
         when (etapa) { // troca de telas feita pelo when
@@ -118,6 +119,38 @@ fun CharacterCreationScreen() {
                             Text("Próximo")
                         }
                     }
+
+
+                    // Exibe a lista de personagens já salvos
+                    Spacer(Modifier.height(24.dp))
+                    Text("Personagens Salvos", style = MaterialTheme.typography.headlineSmall)
+                    Spacer(Modifier.height(12.dp))
+
+                    if (listaPersonagens.isEmpty()) {
+                        Text("Nenhum personagem salvo.")
+                    } else {
+                        LazyColumn(modifier = Modifier.weight(1f)) {
+                            items(listaPersonagens) { p ->
+                                Card(modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(vertical = 4.dp)) {
+                                    Column(modifier = Modifier.padding(12.dp)) {
+                                        Text("${p.nome} - ${p.raca} ${p.classe}", fontWeight = FontWeight.Bold)
+                                        Text("FOR:${p.forca} DES:${p.destreza} CON:${p.constituicao} INT:${p.inteligencia} SAB:${p.sabedoria} CAR:${p.carisma}")
+
+                                        // Botão para deletar
+                                        OutlinedButton(
+                                            onClick = { viewModel.deletar(p) },
+                                            modifier = Modifier.padding(top = 8.dp)
+                                        ) {
+                                            Text("Deletar")
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+
                 }
             }
 
@@ -427,17 +460,34 @@ fun CharacterCreationScreen() {
 
                             Spacer(Modifier.weight(1f))
 
+
+                            // Botão de Salvar
                             Button(onClick = {
-                                // finalize: por enquanto apenas reinicia a criação
+
+                                val novoPersonagem = Personagem(
+                                    nome = nome,
+                                    classe = selectedClass?.nome ?: "N/A",
+                                    raca = selectedRace?.nome ?: "N/A",
+                                    forca = atributos["Força"] ?: 0,
+                                    destreza = atributos["Destreza"] ?: 0,
+                                    constituicao = atributos["Constituição"] ?: 0,
+                                    inteligencia = atributos["Inteligência"] ?: 0,
+                                    sabedoria = atributos["Sabedoria"] ?: 0,
+                                    carisma = atributos["Carisma"] ?: 0
+                                )
+
+                                viewModel.inserir(novoPersonagem)
+
+
                                 nome = ""
                                 atributos.keys.forEach { atributos[it] = 0 }
                                 availableNumbers.clear()
                                 selectedNumber = null
                                 selectedClass = null
                                 selectedRace = null
-                                etapa = 0
+                                etapa = 0 // Volta para a tela inicial
                             }) {
-                                Text("Concluir e reiniciar")
+                                Text("Salvar e Voltar ao Início")
                             }
                         }
                     }
